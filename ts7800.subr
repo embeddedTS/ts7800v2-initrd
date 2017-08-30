@@ -1,0 +1,81 @@
+# Copyright (c) 2007, Technologic Systems.
+# All rights reserved.
+
+# Note: Be sure you have 64-bit arithmetic compiled into your shell, or some
+# of these functions will fail (e.g. for ADDRESS > 0x7FFFFFFF)
+
+# bit_set BIT_WIDTH ADDRESS BIT_NUMBER
+bit_set() {
+  local MASK VAL
+  MASK=$((1<<$3))
+  VAL=`devmem $2 $1`
+  VAL=$((MASK|VAL))
+  devmem $2 $1 $VAL
+}
+                                                                                                                    
+# bit_clr BIT_WIDTH ADDRESS BIT_NUMBER
+bit_clr() {
+  local MASK VAL
+  MASK=$((1<<$3))
+  VAL=`devmem $2 $1`
+  VAL=$((~MASK&VAL))
+  devmem $2 $1 $VAL
+}
+                                                                                                                    
+# bit_get BIT_WIDTH ADDRESS BIT_NUMBER
+bit_get() {
+  local MASK VAL
+  MASK=$((1<<$3))
+  VAL=`devmem $2 $1`
+  VAL=$((VAL>>$3))
+  VAL=$((VAL&1))
+  echo $VAL
+}
+
+led0() {
+  if test "$1" = "0"; then
+    bit_clr 32 0xe8000008 30 > /dev/null
+  else
+    bit_set 32 0xe8000008 30 > /dev/null
+  fi
+}
+
+pc104on() {
+  (
+  devmem  0xe8000030 32 0x55555555
+  devmem  0xe8000034 32 0x55555555
+  devmem  0xe8000038 32 0x55555
+  devmem  0xe800003c 32 0x55555
+  ) > /dev/null 2>&1
+}
+
+pc104off() {
+  (
+  devmem 0xe8000030 32 0x0
+  devmem 0xe8000034 32 0x0
+  devmem 0xe8000038 32 0x0
+  devmem 0xe800003c 32 0x0
+  ) > /dev/null 2>&1
+}
+
+tshelp() {
+  echo "Technologic Systems TS-7800 Linux miniroot commands:"
+  echo "===================================================="
+  echo
+  echo "'exit' - start full Linux boot or exits telnet session"
+  echo "'sdmount' - makes available executables on SD card at /mnt/root"
+  echo "'help' - lists busybox shell built-in Linux commands"
+  echo
+  echo "Contact support@embeddedARM.com for further questions."
+}
+
+sdmount() {
+  (
+  mount /dev/tssdcardb4 /mnt/root
+  ) > /dev/null 2>&1
+}
+
+help() {
+  /bin/busybox
+}
+

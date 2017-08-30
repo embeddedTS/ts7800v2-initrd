@@ -1,0 +1,54 @@
+#!/bin/sh
+# The following code detects if something is connected to USB port 0,
+# and if so checks for a flash drive with /tsinit to execute.
+
+insmod /usbcore.ko
+insmod /ehci-hcd.ko
+sleep 1 
+
+. /ts7800.subr
+
+REG=0
+TMP=0
+while test $TMP -lt 5; do
+  REG=`peekpoke 32 0xf1050460`
+  REG=$((REG&1))
+  if test "$REG" = "1"; then break; fi
+  TMP=$((TMP+1))
+  sleep 1
+done
+
+if test "$REG" = "1"; then
+  led0 1
+
+  TMP=0
+  while test $TMP -lt 20 -a -e /mnt/root/notrootfs; do
+    TMP=$((TMP+1))
+    sleep 1
+  done
+
+  if [ ! -e /mnt/root/notrootfs ]; then
+    modprobe sd_mod
+    modprobe usb-storage
+    modprobe ext3
+    modprobe vfat
+  fi
+
+  TMP=0
+  while test $TMP -lt 15 -a ! -b /dev/sda1; do 
+    TMP=$((TMP+1))
+    mdev -s 
+    sleep 1 
+  done
+  if test -b /dev/sda1; then
+    umount /mnt/root
+    mount -o ro /dev/sda1 /mnt/root
+    if test -x /mnt/root/tsinit; then
+      /mnt/root/tsinit < $CONSOLE > $CONSOLE 2>&1
+    fi
+    umount /mnt/root
+  fi
+  led0 0
+
+fi
+

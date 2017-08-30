@@ -1,0 +1,34 @@
+#!/bin/sh
+
+(
+  insmod /ts7800_nand.ko
+  mdev -s
+
+  if [ -e /dev/mtd3 -a -e /dev/mtdblock3 -a ! -e /mnt/root/notrootfs ]; then
+    echo "Creating bootable flash image..." > $CONSOLE
+    mkdir /dev/mtd
+    ln -s /dev/mtd0 /dev/mtd/0
+    ln -s /dev/mtd1 /dev/mtd/1
+    ln -s /dev/mtd2 /dev/mtd/2
+    ln -s /dev/mtd3 /dev/mtd/3
+    mtdcp /lbin/flash-mbr.dd 0 0 >/dev/null 2>&1
+    mtdcp /dev/tssdcardb2 1 0 >/dev/null 2>&1
+    mtdcp /dev/tssdcardb3 2 0 >/dev/null 2>&1
+
+    echo "Erasing MTD device..." > $CONSOLE
+    flash_eraseall /dev/mtd3 >/dev/null 2>&1
+    echo "Creating YAFFS2 filesystem..." > $CONSOLE
+    mount -t yaffs2 /dev/mtdblock3 /onboardflash
+    echo "Copying /mnt/root/* to MTD... This might take several minutes. " > $CONSOLE
+    sync
+    cp -ar /mnt/root/* /onboardflash
+    chmod 777 /onboardflash/.
+    umount /onboardflash
+    echo "YAFFS2 MTD rootfs created at /dev/mtdblock3" > $CONSOLE
+  else
+    echo "Not able to create MTD rootfs" > $CONSOLE
+    echo "Requires a rootfs mounted at '/mnt/root/'" > $CONSOLE
+  fi
+
+) > /dev/null 2>&1
+

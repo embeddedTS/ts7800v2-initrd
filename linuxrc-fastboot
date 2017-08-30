@@ -1,0 +1,105 @@
+#!/bin/sh
+# Copyright (c) 2007, Technologic Systems.
+# All rights reserved.
+#
+# Uses initrd as root filesystem and drops to shell-- on exit of serial shell,
+# real Linux is booted.  Ethernet is configured as 192.168.0.50 and telnet
+# server is run.  If a USB device is present, it is checked for the presence
+# of an auto-update script "/tsinit", which is then run.
+
+export PATH=/bin:/sbin:/lbin:/mnt/root/bin:/mnt/root/sbin:/mnt/root/usr/bin:/mnt/root/usr/sbin:/mnt/root/usr/local/bin:/mnt/root/usr/local/sbin
+export LD_LIBRARY_PATH=/lib:/usr/lib
+export CONSOLE=/dev/ttyS0
+
+mount -t sysfs none /sys
+echo 1 > /sys/bus/pci/devices/0000:02:00.0/enable
+
+setconsole $CONSOLE
+stty -F $CONSOLE ospeed 115200 > /dev/null 2>&1
+#check-usb-update >/dev/null 2>&1 </dev/null &
+echo TBD: check-usb-update
+
+export BOOTTIME=`mvtime`
+
+(
+  mount -t proc none /proc
+  mount -t tmpfs none /dev
+  mkdir /dev/pts /dev/shm
+  mount -t devpts none /dev/pts
+  mount -t tmpfs none /dev/shm
+
+  mdev -s
+
+  if [ -e /dev/mmcblk0p3 -a -e /mnt/root/notrootfs ]; then
+    mount -o ro /dev/mmcblk0p3 /mnt/root
+    fsck /dev/mmcblk0p3
+  fi
+
+  hostname ts7800-v2
+  ifconfig lo 127.0.0.1 up
+  route add -net 127.0.0.0 netmask 255.0.0.0 lo
+  ifconfig eth0 10.4.50.170 up
+  #route add default gateway 192.168.0.1 eth0
+  /sbin/telnetd
+  sdctl --nodma --address 0xe8000100 --nbd lun0:disc
+  blockdev --rereadpt /dev/nbd0
+  mdev -s
+  ln -sf /dev/nbd0 /dev/tssdcarda1
+  ln -sf /dev/nbd0p1 /dev/tssdcarda2
+  ln -sf /dev/nbd0p2 /dev/tssdcarda3
+  ln -sf /dev/nbd0p3 /dev/tssdcarda4
+  ln -sf /dev/nbd0 /dev/tssdcardb1
+  ln -sf /dev/nbd0p1 /dev/tssdcardb2
+  ln -sf /dev/nbd0p2 /dev/tssdcardb3
+  ln -sf /dev/nbd0p3 /dev/tssdcardb4
+
+  devmem 0xe8000204 32 0x7ff0000
+  setserial /dev/ttyS2 port 0x80 irq 108 baud_base 115200 autoconfig
+  setserial /dev/ttyS3 port 0x88 irq 109 baud_base 115200 autoconfig
+  setserial /dev/ttyS4 port 0x90 irq 110 baud_base 115200 autoconfig
+  setserial /dev/ttyS5 port 0x98 irq 111 baud_base 115200 autoconfig
+  setserial /dev/ttyS6 port 0xa0 irq 112 baud_base 115200 autoconfig
+  setserial /dev/ttyS7 port 0xa8 irq 113 baud_base 115200 autoconfig
+  setserial /dev/ttyS8 port 0xb0 irq 114 baud_base 115200 autoconfig
+  setserial /dev/ttyS9 port 0xb8 irq 115 baud_base 115200 autoconfig
+  setserial /dev/ttyS10 port 0xc0 irq 116 baud_base 115200 autoconfig
+  setserial /dev/ttyS11 port 0xc8 irq 117 baud_base 115200 autoconfig
+
+  setserial /dev/ttyS1 port 0xd0 irq 118 baud_base 115200 autoconfig
+
+  ln -sf /dev/ttyS2 /dev/ttts0
+  ln -sf /dev/ttyS3 /dev/ttts1
+  ln -sf /dev/ttyS4 /dev/ttts2
+  ln -sf /dev/ttyS5 /dev/ttts3
+  ln -sf /dev/ttyS6 /dev/ttts4
+  ln -sf /dev/ttyS7 /dev/ttts5
+  ln -sf /dev/ttyS8 /dev/ttts6
+  ln -sf /dev/ttyS9 /dev/ttts7
+  ln -sf /dev/ttyS10 /dev/ttts8
+  ln -sf /dev/ttyS11 /dev/ttts9
+
+) > /dev/null 2>&1 &
+
+(
+  export ENV=/shinit
+  exec /bin/setsid /bin/cttyhack /bin/sh -i < $CONSOLE > $CONSOLE 2>&1
+)
+wait
+
+if [ -e /mnt/root/sbin/init ]; then
+  killall busybox telnetd > /dev/null 2>&1
+  
+  grep -e '/dev/mmcblk0p3 /mnt/root' /proc/mounts > /dev/null 2>&1
+  if [ "$?" -eq 0 ]; then echo ">> Booting Linux (using onboard Flash)..." > $CONSOLE; fi
+  grep -e '/dev/tssdcarda4 /mnt/root' /proc/mounts > /dev/null 2>&1
+  if [ "$?" -eq 0 ]; then echo ">> Booting Linux (using SD Card)..." > $CONSOLE; fi
+
+  fsck /dev/mmcblk0p3 > /dev/null 2>&1
+  cd /mnt/root
+  pivot_root . ./initrd
+  ./bin/mount -n --move ./initrd/dev ./dev
+  ./bin/mount -n --move ./initrd/sys ./sys
+  ./bin/mount -n --move ./initrd/proc ./proc
+  exec ./usr/sbin/chroot . ./sbin/init < .$CONSOLE > .$CONSOLE 2>&1
+fi
+

@@ -1,0 +1,11 @@
+# Copyright (c) 2007, Technologic Systems.
+# All rights reserved.
+
+. /ts7800.subr
+
+case $- in *i*)
+	stty ospeed 115200 >/dev/null 2>&1
+	echo "Finished booting in $BOOTTIME seconds"
+	echo "Type 'tshelp' for help"
+esac
+

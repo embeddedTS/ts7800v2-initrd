@@ -1,0 +1,23 @@
+echo "Saving ramdisk, please do not remove power until finished."
+dd if=/dev/zero of=/zerofiller > /dev/null 2>&1
+rm -f /zerofiller
+mount -o remount,ro rootfs /
+
+insmod /tssdcard.ko >/dev/null 2>&1
+insmod /ts7800_nand.ko >/dev/null 2>&1
+mdev -s
+
+if [ -e /dev/tssdcardb3 ]; then
+  echo "Saving to SD Card..."
+  dd if=/dev/ram0 of=/dev/tssdcardb3 >/dev/null 2>&1
+fi
+                                                                                                                                    
+if [ -e /dev/mtdblock2 ]; then
+  echo "Saving to flash..."
+  mkdir /dev/mtd >/dev/null 2>&1
+  ln -s /dev/mtd2 /dev/mtd/2 >/dev/null 2>&1
+  mtdcp /dev/ram0 2 0 >/dev/null 2>&1
+fi
+                                                                                                                                    
+mount -o remount,rw rootfs /
+
