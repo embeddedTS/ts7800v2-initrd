@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2007, Technologic Systems.
+# Copyright (c) 2007-2022 Technologic Systems, Inc. dba embeddedTS.
 # All rights reserved.
 #
 # Uses initrd as root filesystem and drops to shell-- on exit of serial shell,
